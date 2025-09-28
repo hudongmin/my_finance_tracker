@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <header>
-      <h1>我的家庭财务中心</h1>
+      <h1>财富自由</h1>
       <nav class="nav">
         <button :class="{active: currentPage==='home'}" @click="go('home')">主页</button>
         <button :class="{active: currentPage==='wealth'}" @click="go('wealth')">财富增值</button>
@@ -24,22 +24,19 @@
       <div class="quick-cards">
         <div class="card">
           <h3>当前总资产</h3>
-          <!-- ★ 做兜底，避免 undefined.toFixed -->
-          <p class="big">¥ {{ Number(totalCurrentValue ?? 0).toFixed(2) }}</p>
+          <p class="big">¥ {{ (totalCurrentValue || 0).toFixed(2) }}</p>
         </div>
         <div class="card">
           <h3>当月净收支</h3>
-          <!-- ★ 做兜底 -->
-          <p class="big" :class="(Number(netThisMonth) >= 0) ? 'buy' : 'sell'">
-            ¥ {{ Number(netThisMonth ?? 0).toFixed(2) }}
-          </p>
+          <p class="big" :class="netThisMonth>=0 ? 'buy' : 'sell'">¥ {{ netThisMonth.toFixed(2) }}</p>
         </div>
       </div>
     </section>
 
-    <!-- 财富增值 -->
+    <!-- 财富增值（完整） -->
     <section v-if="currentPage==='wealth'" class="page">
       <div class="column">
+        <!-- 添加资产的表单 -->
         <div class="form-container">
           <h2>
             添加新资产
@@ -57,9 +54,11 @@
               <option>房产</option>
               <option>其他</option>
             </select>
-
+            
+            <!-- 初始成本作为首笔买入（可选） -->
             <input v-model.number="newAsset.initial_cost" type="number" step="0.01" inputmode="decimal" placeholder="初始总成本 (可选)">
 
+            <!-- 资产风格 -->
             <label class="muted">资产风格</label>
             <select v-model="newAsset.asset_style">
               <option value="manual">手动</option>
@@ -67,6 +66,7 @@
               <option value="fixed">固定期限/固收</option>
             </select>
 
+            <!-- 市场型资产 -->
             <div v-if="newAsset.asset_style === 'market'" class="market-asset-section">
               <div class="search-input-wrapper">
                 <input type="text" v-model="newAsset.symbol" @input="handleSearchInput" placeholder="输入代码/名称自动搜索" autocomplete="off">
@@ -85,6 +85,7 @@
               <input type="number" step="any" inputmode="decimal" v-model.number="newAsset.quantity" placeholder="持有份额/股数">
             </div>
 
+            <!-- 固定期限/固收 -->
             <div v-if="newAsset.asset_style === 'fixed'">
               <div class="row">
                 <input type="number" step="0.0001" inputmode="decimal" v-model.number="newAsset.rate" placeholder="年化收益率，例如 0.03">
@@ -115,6 +116,7 @@
           </form>
         </div>
 
+        <!-- 资产分布图表 -->
         <div class="chart-container">
           <h2>
             资产分布 (按{{ chartMode === 'cost' ? '成本' : '现值' }}查看)
@@ -123,6 +125,7 @@
           <v-chart class="chart" :option="chartOption" autoresize />
         </div>
 
+        <!-- 历史总资产趋势图（快照） -->
         <div class="chart-container">
           <h2>
             资产趋势（总价值）
@@ -134,6 +137,7 @@
           <v-chart class="chart" :option="trendOption" autoresize />
         </div>
 
+        <!-- 资产预测走势图（基于模拟的分位数） -->
         <div v-if="simTable.length" class="chart-container">
           <h2>
             资产预测（P50与P5-P95区间）
@@ -142,6 +146,7 @@
           <v-chart class="chart" :option="forecastOption" autoresize />
         </div>
 
+        <!-- 模拟结果（分位表） -->
         <div v-if="simTable.length" class="form-container">
           <h2>组合模拟结果（分位数表）</h2>
           <table class="sim-table">
@@ -161,6 +166,7 @@
       </div>
 
       <div class="column">
+        <!-- 资产列表 -->
         <div class="asset-list-container">
           <h2>我的资产 ({{ assets.length }} 项)</h2>
           <ul>
@@ -183,6 +189,7 @@
           </ul>
         </div>
 
+        <!-- 操作面板 -->
         <div v-if="selectedAsset" class="transaction-container">
           <h2>{{ selectedAsset.name }} - 操作面板</h2>
           <form @submit.prevent="updateValue" class="value-form">
@@ -209,8 +216,9 @@
       </div>
     </section>
 
-    <!-- 收支预算 -->
+    <!-- 收支预算（重构布局） -->
     <section v-if="currentPage==='budget'" class="page budget-page">
+      <!-- 顶部工具条（吸顶） -->
       <div class="toolbar sticker">
         <div class="left">
           <label class="muted">月份</label>
@@ -219,13 +227,14 @@
           <button class="btn ghost" @click="fetchBudget">刷新</button>
         </div>
         <div class="right">
-          <div class="pill good">收入 ¥ {{ Number(incomeThisMonth ?? 0).toFixed(2) }}</div>
-          <div class="pill bad">支出 ¥ {{ Number(expenseThisMonth ?? 0).toFixed(2) }}</div>
-          <div class="pill" :class="netThisMonth>=0 ? 'good' : 'bad'">结余 ¥ {{ Number(netThisMonth ?? 0).toFixed(2) }}</div>
+          <div class="pill good">收入 ¥ {{ incomeThisMonth.toFixed(2) }}</div>
+          <div class="pill bad">支出 ¥ {{ expenseThisMonth.toFixed(2) }}</div>
+          <div class="pill" :class="netThisMonth>=0 ? 'good' : 'bad'">结余 ¥ {{ netThisMonth.toFixed(2) }}</div>
         </div>
       </div>
 
       <div class="budget-grid">
+        <!-- 左：快速记一笔 + 固定规则 -->
         <div class="leftcol">
           <div class="card">
             <h3>快速记一笔</h3>
@@ -289,6 +298,7 @@
           </div>
         </div>
 
+        <!-- 右：当月明细表 + 过滤和排序 -->
         <div class="rightcol">
           <div class="card">
             <div class="table-toolbar">
@@ -363,7 +373,6 @@
 </template>
 
 <script>
-import { API_URL } from './config/api';
 import axios from 'axios';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -372,8 +381,7 @@ import { TitleComponent, TooltipComponent, LegendComponent, GridComponent, DataZ
 import VChart, { THEME_KEY } from 'vue-echarts';
 
 use([ CanvasRenderer, PieChart, LineChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, DataZoomComponent ]);
-
-const http = axios.create({ baseURL: API_URL, timeout: 15000 });
+const API_URL = 'http://127.0.0.1:5001/api';
 
 export default {
   name: 'App',
@@ -414,21 +422,14 @@ export default {
       planSeries: []
     };
   },
-
   computed: {
-    // —— 关键的两个（修复首页/预算页渲染错误） ——
-    totalCurrentValue(){
-      return this.assets.reduce((s,a)=> s + (Number(a.current_value) || 0), 0);
-    },
-    netThisMonth(){
-      return (Number(this.incomeThisMonth) || 0) - (Number(this.expenseThisMonth) || 0);
-    },
-
-    // —— 资产分布饼图 ——
+    // —— 财富增值 ——
+    totalCurrentValue(){ return this.assets.reduce((s,a)=>s+(a.current_value||0),0); },
+    totalProfit(){ return this.assets.reduce((s,a)=>s+(a.profit||0),0); },
     chartOption(){
       const dataKey = this.chartMode === 'cost' ? 'total_cost' : 'current_value';
       const distribution = this.assets.reduce((acc, asset) => {
-        const value = Number(asset[dataKey]) || 0;
+        const value = asset[dataKey] || 0;
         if (value > 0) {
           const key = (asset.type || '其他') + (asset.asset_style === 'fixed' ? '(固收)' : '');
           acc[key] = (acc[key] || 0) + value;
@@ -436,28 +437,13 @@ export default {
         return acc;
       }, {});
       const dataForChart = Object.keys(distribution).map(key => ({ name: key, value: distribution[key] }));
-      return {
-        tooltip: { trigger: 'item', formatter: '{a} <br/>{b} : ¥ {c} ({d}%)' },
-        legend: { orient: 'vertical', left: 'left', data: Object.keys(distribution) },
-        series: [{ name: '资产类型', type: 'pie', radius: '70%', center: ['65%', '50%'], data: dataForChart }]
-      };
+      return { tooltip: { trigger: 'item', formatter: '{a} <br/>{b} : ¥ {c} ({d}%)' }, legend: { orient: 'vertical', left: 'left', data: Object.keys(distribution) }, series: [{ name: '资产类型', type: 'pie', radius: '70%', center: ['65%', '50%'], data: dataForChart }] };
     },
-
-    // —— 总资产快照折线 ——
     trendOption(){
       const d = (this.snapshots || []).map(s => ({ value: [s.created_at, s.total_value] }));
       const fmt = v => '¥ ' + (Number(v) || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      return {
-        tooltip: { trigger: 'axis', valueFormatter: (val) => fmt(val) },
-        grid: { left: 48, right: 24, top: 36, bottom: 50 },
-        xAxis: { type: 'time' },
-        yAxis: { type: 'value' },
-        dataZoom: [ { type: 'inside' }, { type: 'slider', height: 18, bottom: 12 } ],
-        series: [ { name: '总资产', type: 'line', showSymbol: false, data: d } ]
-      };
+      return { tooltip: { trigger: 'axis', valueFormatter: (val) => fmt(val) }, grid: { left: 48, right: 24, top: 36, bottom: 50 }, xAxis: { type: 'time' }, yAxis: { type: 'value' }, dataZoom: [ { type: 'inside' }, { type: 'slider', height: 18, bottom: 12 } ], series: [ { name: '总资产', type: 'line', showSymbol: false, data: d } ] };
     },
-
-    // —— 模拟预测（分位带） ——
     forecastOption(){
       const cats = this.simTable.map(r => `第${r.year}年`);
       const p5 = this.simTable.map(r => r.p5);
@@ -465,21 +451,10 @@ export default {
       const p95 = this.simTable.map(r => r.p95);
       const band = p95.map((v, i) => v - p5[i]);
       const fmt = v => '¥ ' + (Number(v) || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      return {
-        tooltip: { trigger: 'axis', valueFormatter: (val) => fmt(val) },
-        legend: { data: ['P50', 'P5-P95 区间'] },
-        grid: { left: 48, right: 24, top: 36, bottom: 50 },
-        xAxis: { type: 'category', data: cats },
-        yAxis: { type: 'value' },
-        series: [
-          { name: 'P5 基线', type: 'line', data: p5, showSymbol: false, lineStyle: { width: 0 }, stack: 'band', areaStyle: { opacity: 0 } },
-          { name: 'P5-P95 区间', type: 'line', data: band, showSymbol: false, stack: 'band', areaStyle: { } },
-          { name: 'P50', type: 'line', data: p50, showSymbol: true }
-        ]
-      };
+      return { tooltip: { trigger: 'axis', valueFormatter: (val) => fmt(val) }, legend: { data: ['P50', 'P5-P95 区间'] }, grid: { left: 48, right: 24, top: 36, bottom: 50 }, xAxis: { type: 'category', data: cats }, yAxis: { type: 'value' }, series: [ { name: 'P5 基线', type: 'line', data: p5, showSymbol: false, lineStyle: { width: 0 }, stack: 'band', areaStyle: { opacity: 0 } }, { name: 'P5-P95 区间', type: 'line', data: band, showSymbol: false, stack: 'band', areaStyle: { } }, { name: 'P50', type: 'line', data: p50, showSymbol: true } ] };
     },
-
-    // —— 预算页：分类&热区 ——
+    // —— 收支预算 ——
+    netThisMonth(){ return this.incomeThisMonth - this.expenseThisMonth; },
     allCategories(){
       const set = new Set();
       this.budgetEntries.forEach(r => set.add(r.category));
@@ -491,8 +466,6 @@ export default {
       this.budgetEntries.slice(-30).forEach(r => freq.set(r.category, (freq.get(r.category)||0)+1));
       return Array.from(freq.entries()).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([c])=>c);
     },
-
-    // —— 预算过滤/排序/合计 ——
     filteredEntries(){
       return this.budgetEntries.filter(r => {
         if(this.filter.type!=='全部' && r.type!==this.filter.type) return false;
@@ -518,36 +491,22 @@ export default {
     totalAmountFiltered(){
       return this.sortedFilteredEntries.reduce((s,r)=>s+Number(r.amount||0),0);
     },
-
-    // —— 规划曲线图 ——
+    // —— 财务规划 ——
     planOption(){
       const cats=this.planSeries.map(p=>p.month);
       const wealth=this.planSeries.map(p=>p.wealth);
       const income=this.planSeries.map(p=>p.income);
       const expense=this.planSeries.map(p=>p.expense);
       const fmt=v=>'¥ '+(Number(v)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      return {
-        tooltip:{ trigger:'axis', valueFormatter:(val)=>fmt(val) },
-        legend:{ data:['财富','收入','支出'] },
-        grid:{ left:48, right:24, top:36, bottom:50 },
-        xAxis:{ type:'category', data:cats },
-        yAxis:{ type:'value' },
-        dataZoom:[{type:'inside'},{type:'slider',height:16,bottom:10}],
-        series:[
-          {name:'财富', type:'line', data:wealth, showSymbol:false},
-          {name:'收入', type:'line', data:income, showSymbol:false},
-          {name:'支出', type:'line', data:expense, showSymbol:false}
-        ]
-      };
+      return { tooltip:{ trigger:'axis', valueFormatter:(val)=>fmt(val) }, legend:{ data:['财富','收入','支出'] }, grid:{ left:48, right:24, top:36, bottom:50 }, xAxis:{ type:'category', data:cats }, yAxis:{ type:'value' }, dataZoom:[{type:'inside'},{type:'slider',height:16,bottom:10}], series:[ {name:'财富', type:'line', data:wealth, showSymbol:false}, {name:'收入', type:'line', data:income, showSymbol:false}, {name:'支出', type:'line', data:expense, showSymbol:false} ] };
     }
   },
-
   methods: {
     // —— 导航 ——
     go(p){ this.currentPage=p; if(p==='budget'){ this.fetchBudget(); this.fetchRules(); } if(p==='planning'){ this.runPlan(); } },
 
     // —— 财富增值 ——
-    async fetchAssets(){ try{ const {data}=await http.get('/assets'); this.assets=data; }catch(e){ console.error('获取资产失败',e);} },
+    async fetchAssets(){ try{ const {data}=await axios.get(`${API_URL}/assets`); this.assets=data; }catch(e){ console.error('获取资产失败',e);} },
     async addAsset(){
       try{
         const payload={...this.newAsset};
@@ -555,187 +514,141 @@ export default {
         if(!payload.symbol) delete payload.symbol;
         if(!payload.quantity && payload.quantity!==0) delete payload.quantity;
         if(payload.asset_style!=='fixed'){ delete payload.rate; delete payload.compounding; delete payload.start_date; delete payload.end_date; delete payload.contribution; delete payload.contribution_freq; }
-        const {data:created}=await http.post('/assets',payload);
+        const {data:created}=await axios.post(`${API_URL}/assets`,payload);
         let updated=created;
-        if(payload.initial_cost && payload.initial_cost>0){
-          const {data:withTx}=await http.post(`/assets/${created.id}/transactions`,{type:'买入',amount:payload.initial_cost});
-          updated=withTx;
-        }
+        if(payload.initial_cost && payload.initial_cost>0){ const {data:withTx}=await axios.post(`${API_URL}/assets/${created.id}/transactions`,{type:'买入',amount:payload.initial_cost}); updated=withTx; }
         this.assets.push(updated);
         this.newAsset={ name:'', type:'', initial_cost:null, asset_style:'manual', symbol:'', quantity:null, rate:null, compounding:'annual', start_date:'', end_date:'', contribution:null, contribution_freq:'monthly' };
         this.searchResults=[];
       }catch(e){ console.error('添加资产失败',e); alert('添加资产失败，请检查控制台信息。'); }
     },
-    async deleteAsset(id){
-      if(confirm('确定要删除这个资产及其所有交易记录吗？')){
-        try{
-          await http.delete(`/assets/${id}`);
-          this.assets=this.assets.filter(a=>a.id!==id);
-          if(this.selectedAsset && this.selectedAsset.id===id){ this.selectedAsset=null; }
-        }catch(e){ console.error('删除资产失败',e);}
-      }
-    },
+    async deleteAsset(id){ if(confirm('确定要删除这个资产及其所有交易记录吗？')){ try{ await axios.delete(`${API_URL}/assets/${id}`); this.assets=this.assets.filter(a=>a.id!==id); if(this.selectedAsset && this.selectedAsset.id===id){ this.selectedAsset=null; } }catch(e){ console.error('删除资产失败',e);} } },
     selectAsset(a){ this.selectedAsset=a; this.tempCurrentValue=a.current_value; },
-    async addTransaction(){ try{ const {data}=await http.post(`/assets/${this.selectedAsset.id}/transactions`,this.newTransaction); this.updateLocalAssetData(data); this.newTransaction.amount=null; }catch(e){ console.error('添加交易失败',e);} },
-    async updateValue(){ try{ const {data}=await http.put(`/assets/${this.selectedAsset.id}/value`,{current_value:this.tempCurrentValue}); this.updateLocalAssetData(data); alert('当前价值已更新！'); }catch(e){ console.error('更新价值失败',e);} },
+    async addTransaction(){ try{ const {data}=await axios.post(`${API_URL}/assets/${this.selectedAsset.id}/transactions`,this.newTransaction); this.updateLocalAssetData(data); this.newTransaction.amount=null; }catch(e){ console.error('添加交易失败',e);} },
+    async updateValue(){ try{ const {data}=await axios.put(`${API_URL}/assets/${this.selectedAsset.id}/value`,{current_value:this.tempCurrentValue}); this.updateLocalAssetData(data); alert('当前价值已更新！'); }catch(e){ console.error('更新价值失败',e);} },
     toggleChartMode(){ this.chartMode=this.chartMode==='cost'?'value':'cost'; },
-    updateLocalAssetData(updated){
-      if(!updated) return;
-      const norm=v=>(v!=null?String(v):v);
-      const id=norm(updated.id??updated.asset_id);
-      const idx=this.assets.findIndex(a=>norm(a.id)===id);
-      if(idx!==-1) this.assets[idx]={...this.assets[idx],...updated,id:updated.id};
-      if(this.selectedAsset && norm(this.selectedAsset.id)===id){
-        this.selectedAsset={...this.selectedAsset,...updated,id:updated.id};
-        this.tempCurrentValue=this.selectedAsset.current_value;
-      }
-      if(idx===-1 && this.selectedAsset){
-        const sid=norm(this.selectedAsset.id);
-        const sidx=this.assets.findIndex(a=>norm(a.id)===sid);
-        if(sidx!==-1) this.assets[sidx]={...this.assets[sidx],...updated,id:updated.id??this.assets[sidx].id};
-      }
-    },
-    handleSearchInput(){
-      clearTimeout(this.debounceTimer); this.searchPerformed=false;
-      if(!(this.newAsset.symbol||'').trim()){ this.searchResults=[]; return; }
-      this.debounceTimer=setTimeout(()=>{ this.doSearch(); },500);
-    },
-    async doSearch(){
-      const q=(this.newAsset.symbol||'').trim(); if(!q) return;
-      this.searching=true; this.searchResults=[]; this.searchPerformed=false;
-      try{ const {data}=await http.get('/search',{params:{q}}); this.searchResults=data||[]; }
-      catch(e){ console.error(e); this.searchResults=[]; }
-      finally{ this.searching=false; this.searchPerformed=true; }
-    },
+    updateLocalAssetData(updated){ if(!updated) return; const norm=v=>(v!=null?String(v):v); const id=norm(updated.id??updated.asset_id); const idx=this.assets.findIndex(a=>norm(a.id)===id); if(idx!==-1) this.assets[idx]={...this.assets[idx],...updated,id:updated.id}; if(this.selectedAsset && norm(this.selectedAsset.id)===id){ this.selectedAsset={...this.selectedAsset,...updated,id:updated.id}; this.tempCurrentValue=this.selectedAsset.current_value; } if(idx===-1 && this.selectedAsset){ const sid=norm(this.selectedAsset.id); const sidx=this.assets.findIndex(a=>norm(a.id)===sid); if(sidx!==-1) this.assets[sidx]={...this.assets[sidx],...updated,id:updated.id??this.assets[sidx].id}; } },
+    handleSearchInput(){ clearTimeout(this.debounceTimer); this.searchPerformed=false; if(!(this.newAsset.symbol||'').trim()){ this.searchResults=[]; return; } this.debounceTimer=setTimeout(()=>{ this.doSearch(); },500); },
+    async doSearch(){ const q=(this.newAsset.symbol||'').trim(); if(!q) return; this.searching=true; this.searchResults=[]; this.searchPerformed=false; try{ const {data}=await axios.get(`${API_URL}/search`,{params:{q}}); this.searchResults=data||[]; }catch(e){ console.error(e); this.searchResults=[]; }finally{ this.searching=false; this.searchPerformed=true; } },
     pickSearch(r){ this.newAsset.symbol=r.symbol; if(!this.newAsset.name) this.newAsset.name=r.name||r.symbol; this.searchResults=[]; this.searchPerformed=false; },
-    async refreshQuote(a){
-      if(!a.symbol) return;
-      try{
-        const {data}=await http.get('/quote',{params:{symbol:a.symbol}});
-        const newCV=(data.price||0)*(a.quantity||0);
-        const {data:updated}=await http.put(`/assets/${a.id}/value`,{current_value:newCV});
-        this.updateLocalAssetData(updated);
-      }catch(e){ console.error(e);}
-    },
-    async fetchSnapshots(){ try{ const {data}=await http.get('/snapshots',{params:{limit:500}}); this.snapshots=data||[]; }catch(e){ console.error('获取快照失败',e);} },
-    async addSnapshot(){ try{ const {data}=await http.post('/snapshots'); this.snapshots=[...this.snapshots,data].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)); }catch(e){ console.error('记录快照失败',e); alert('记录失败，请查看控制台。'); } },
-    async runSimulate(){
-      try{
-        const total=this.totalCurrentValue||1;
-        const assets=this.assets.map(a=>{
-          const w=Math.max(0,(a.current_value||0))/total;
-          let mu=0.03, sigma=0.05;
-          if(a.type==='股票'){ mu=0.08; sigma=0.2;}
-          if(a.type==='基金'){ mu=0.06; sigma=0.15;}
-          if(a.asset_style==='fixed'){ mu=a.rate||0.03; sigma=0.01;}
-          return {id:a.id, weight:w, mu, sigma};
-        });
-        const body={ years:5, steps_per_year:12, n_paths:2000, assets, start_value:this.totalCurrentValue };
-        const {data}=await http.post('/simulate',body);
-        this.simTable=data.table||[];
-        if(!this.simTable.length) alert('模拟结果为空，请检查参数。');
-      }catch(e){ console.error(e); alert('模拟失败，请检查控制台错误信息。'); }
-    },
+    async refreshQuote(a){ if(!a.symbol) return; try{ const {data}=await axios.get(`${API_URL}/quote`,{params:{symbol:a.symbol}}); const newCV=(data.price||0)*(a.quantity||0); const {data:updated}=await axios.put(`${API_URL}/assets/${a.id}/value`,{current_value:newCV}); this.updateLocalAssetData(updated); }catch(e){ console.error(e);} },
+    async fetchSnapshots(){ try{ const {data}=await axios.get(`${API_URL}/snapshots`,{params:{limit:500}}); this.snapshots=data||[]; }catch(e){ console.error('获取快照失败',e);} },
+    async addSnapshot(){ try{ const {data}=await axios.post(`${API_URL}/snapshots`); this.snapshots=[...this.snapshots,data].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)); }catch(e){ console.error('记录快照失败',e); alert('记录失败，请查看控制台。'); } },
+    async runSimulate(){ try{ const total=this.totalCurrentValue||1; const assets=this.assets.map(a=>{ const w=Math.max(0,(a.current_value||0))/total; let mu=0.03, sigma=0.05; if(a.type==='股票'){ mu=0.08; sigma=0.2;} if(a.type==='基金'){ mu=0.06; sigma=0.15;} if(a.asset_style==='fixed'){ mu=a.rate||0.03; sigma=0.01;} return {id:a.id, weight:w, mu, sigma}; }); const body={ years:5, steps_per_year:12, n_paths:2000, assets, start_value:this.totalCurrentValue }; const {data}=await axios.post(`${API_URL}/simulate`,body); this.simTable=data.table||[]; if(!this.simTable.length) alert('模拟结果为空，请检查参数。'); }catch(e){ console.error(e); alert('模拟失败，请检查控制台错误信息。'); } },
 
-    // —— 预算 ——
-    monthBounds(){
-      const [y,m]=this.month.split('-').map(x=>parseInt(x,10));
-      const start=`${y}-${String(m).padStart(2,'0')}-01`;
-      const end=new Date(y,m,0).toISOString().slice(0,10);
-      return {start,end};
-    },
-    async fetchBudget(){
-      try{
-        const {start,end}=this.monthBounds();
-        const {data}=await http.get('/budget/entries',{params:{start,end}});
-        this.budgetEntries=data||[];
-        await this.fetchBudgetSummary();
-      }catch(e){ console.error('获取预算失败',e);}
-    },
-    async fetchBudgetSummary(){
-      try{
-        const {start,end}=this.monthBounds();
-        const {data}=await http.get('/budget/summary',{params:{start,end}});
-        this.incomeThisMonth=data.income||0;
-        this.expenseThisMonth=data.expense||0;
-      }catch(e){ console.error('获取预算汇总失败',e);}
-    },
-    async addBudgetEntry(){
-      try{
-        const payload={...this.newEntry};
-        if(!payload.category || !payload.amount || !payload.date){
-          alert('请完整填写日期/类型/类别/金额'); return;
-        }
-        const {data}=await http.post('/budget/entries',payload);
-        this.budgetEntries=[...this.budgetEntries,data];
-        this.newEntry={ ...this.newEntry, category:'', amount:null, note:'' };
-        await this.fetchBudgetSummary();
-      }catch(e){ console.error('新增收支失败',e);}
-    },
-    async deleteBudgetEntry(id){
-      if(confirm('删除该记录？')){
-        try{
-          await http.delete(`/budget/entries/${id}`);
-          this.budgetEntries=this.budgetEntries.filter(r=>r.id!==id);
-          await this.fetchBudgetSummary();
-        }catch(e){ console.error('删除失败',e);}
-      }
-    },
-    async fetchRules(){ try{ const {data}=await http.get('/budget/rules'); this.budgetRules=(data||[]); }catch(e){ console.error('获取规则失败',e);} },
-    async addRule(){
-      try{
-        const p={...this.newRule};
-        if(!p.category||!p.amount||!p.start_month){
-          alert('请填写类型/类别/金额/起始月份'); return;
-        }
-        const {data}=await http.post('/budget/rules',p);
-        this.budgetRules=[...this.budgetRules,data];
-        this.newRule={ type:'支出', category:'', amount:null, start_month:this.month, end_month:'', growth_rate:0 };
-      }catch(e){ console.error('新增规则失败',e);}
-    },
-    async deleteRule(id){
-      if(confirm('删除该规则？')){
-        try{
-          await http.delete(`/budget/rules/${id}`);
-          this.budgetRules=this.budgetRules.filter(r=>r.id!==id);
-        }catch(e){ console.error('删除规则失败',e);}
-      }
-    },
-    async autofillMonth(){
-      try{
-        const {start}=this.monthBounds();
-        const month=start.slice(0,7);
-        const {data}=await http.post('/budget/autofill',{ month });
-        if(Array.isArray(data)){
-          await this.fetchBudget();
-          alert(`已填充 ${data.length} 条默认项目`);
-        }
-      }catch(e){ console.error('一键填充失败',e); alert('填充失败，请查看控制台。'); }
-    },
+    // —— 收支预算 ——
+    monthBounds(){ const [y,m]=this.month.split('-').map(x=>parseInt(x,10)); const start=`${y}-${String(m).padStart(2,'0')}-01`; const end=new Date(y,m,0).toISOString().slice(0,10); return {start,end}; },
+    async fetchBudget(){ try{ const {start,end}=this.monthBounds(); const {data}=await axios.get(`${API_URL}/budget/entries`,{params:{start,end}}); this.budgetEntries=data||[]; await this.fetchBudgetSummary(); }catch(e){ console.error('获取预算失败',e);} },
+    async fetchBudgetSummary(){ try{ const {start,end}=this.monthBounds(); const {data}=await axios.get(`${API_URL}/budget/summary`,{params:{start,end}}); this.incomeThisMonth=data.income||0; this.expenseThisMonth=data.expense||0; }catch(e){ console.error('获取预算汇总失败',e);} },
+    async addBudgetEntry(){ try{ const payload={...this.newEntry}; if(!payload.category || !payload.amount || !payload.date){ alert('请完整填写日期/类型/类别/金额'); return; } const {data}=await axios.post(`${API_URL}/budget/entries`,payload); this.budgetEntries=[...this.budgetEntries,data]; this.newEntry={ ...this.newEntry, category:'', amount:null, note:'' }; await this.fetchBudgetSummary(); }catch(e){ console.error('新增收支失败',e);} },
+    async deleteBudgetEntry(id){ if(confirm('删除该记录？')){ try{ await axios.delete(`${API_URL}/budget/entries/${id}`); this.budgetEntries=this.budgetEntries.filter(r=>r.id!==id); await this.fetchBudgetSummary(); }catch(e){ console.error('删除失败',e);} } },
+    async fetchRules(){ try{ const {data}=await axios.get(`${API_URL}/budget/rules`); this.budgetRules=(data||[]); }catch(e){ console.error('获取规则失败',e);} },
+    async addRule(){ try{ const p={...this.newRule}; if(!p.category||!p.amount||!p.start_month){ alert('请填写类型/类别/金额/起始月份'); return; } const {data}=await axios.post(`${API_URL}/budget/rules`,p); this.budgetRules=[...this.budgetRules,data]; this.newRule={ type:'支出', category:'', amount:null, start_month:this.month, end_month:'', growth_rate:0 }; }catch(e){ console.error('新增规则失败',e);} },
+    async deleteRule(id){ if(confirm('删除该规则？')){ try{ await axios.delete(`${API_URL}/budget/rules/${id}`); this.budgetRules=this.budgetRules.filter(r=>r.id!==id); }catch(e){ console.error('删除规则失败',e);} } },
+    async autofillMonth(){ try{ const {start}=this.monthBounds(); const month=start.slice(0,7); const {data}=await axios.post(`${API_URL}/budget/autofill`,{ month }); if(Array.isArray(data)){ await this.fetchBudget(); alert(`已填充 ${data.length} 条默认项目`); } }catch(e){ console.error('一键填充失败',e); alert('填充失败，请查看控制台。'); } },
     sortBy(k){ if(this.sort.key===k){ this.sort.dir=this.sort.dir==='asc'?'desc':'asc'; } else { this.sort.key=k; this.sort.dir='asc'; } },
     sortIcon(k){ if(this.sort.key!==k) return ''; return this.sort.dir==='asc'?'asc':'desc'; },
     resetFilters(){ this.filter={ type:'全部', category:'全部', q:'' }; },
 
     // —— 财务规划 ——
-    async runPlan(){
-      try{
-        const body={ years:this.planYears, annual_return:this.planReturn };
-        const {data}=await http.post('/plan/curve',body);
-        this.planSeries=data.points||[];
-      }catch(e){ console.error('生成规划失败',e);}
-    }
+    async runPlan(){ try{ const body={ years:this.planYears, annual_return:this.planReturn }; const {data}=await axios.post(`${API_URL}/plan/curve`,body); this.planSeries=data.points||[]; }catch(e){ console.error('生成规划失败',e);} }
   },
-
   created(){ this.fetchAssets(); this.fetchSnapshots(); this.fetchBudget(); this.fetchRules(); }
 };
 </script>
 
 <style>
-/* 样式保持不变 */
 #app { font-family: Avenir, Helvetica, Arial, sans-serif; max-width: 1400px; margin: 32px auto; color: #2c3e50; }
 header { text-align: center; margin-bottom: 16px; }
 .nav { display: inline-flex; gap: 8px; }
 .nav button { padding: 6px 12px; border: 1px solid #ddd; background: #fff; border-radius: 8px; cursor: pointer; }
 .nav button.active { background: #42b983; color: #fff; border-color: #42b983; }
-/* …下方样式与你原来一致，我就不重复了… */
+
+.page { display: flex; gap: 40px; }
+.column { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+.form-container, .asset-list-container, .transaction-container, .placeholder, .chart-container { border: 1px solid #eaeaea; border-radius: 8px; padding: 20px; background:#fff; }
+h2 { margin-top: 0; display: flex; justify-content: space-between; align-items: center; }
+.toggle-btn { padding: 4px 8px; font-size: 12px; background-color: #eee; color: #333; border: 1px solid #ddd; border-radius: 6px; }
+.chart-container { height: 360px; }
+.chart { height: 100%; }
+.profit { font-size: 12px; }
+.buy { color: green; }
+.sell { color: red; }
+.value-form { display: flex; gap: 10px; margin-bottom: 20px; padding-bottom:20px; border-bottom: 1px solid #eee; }
+.value-form input { flex: 1; }
+ul { list-style: none; padding: 0; margin: 0; }
+li { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+li:hover { background-color: #f9f9f9; }
+li.selected { background-color: #e8f5e9; }
+.asset-info { display: flex; flex-direction: column; }
+.asset-type { font-size: 12px; color: #777; }
+.asset-value { display: flex; align-items: center; gap: 10px; }
+.delete-btn { background-color: #e57373; color: white; border-radius: 50%; width: 24px; height: 24px; padding: 0; line-height: 24px; text-align: center; font-size: 14px; border: none; cursor: pointer; }
+input, select, button { padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd; margin-top: 8px; }
+button { background-color: #42b983; color: white; border: none; cursor: pointer; }
+button:hover { background-color: #36a476; }
+.transaction-form { display: flex; gap: 10px; margin-bottom: 20px; }
+.transaction-form input { flex: 1; }
+.placeholder { text-align: center; padding: 100px 20px; color: #999; }
+.row { display: flex; gap: 8px; }
+.search-list { max-height: 180px; overflow: auto; border: 1px solid #eee; border-radius: 6px; padding: 6px; margin: 0; background:#fff; }
+.search-list li { padding: 6px 8px; border-bottom: 1px solid #f1f1f1; }
+.search-list li:last-child { border-bottom: 0; }
+.muted { font-size: 12px; color: #777; margin-top: 6px; }
+.sim-table { width: 100%; border-collapse: collapse; }
+.sim-table th, .sim-table td { border: 1px solid #eee; padding: 8px; text-align: left; }
+.sim-table td:nth-child(4), .sim-table th:nth-child(4) { text-align: right; }
+.sim-table th:first-child, .sim-table td:first-child { white-space: nowrap; }
+.market-asset-section { display: flex; flex-direction: column; gap: 8px; }
+.search-input-wrapper { position: relative; width: 100%; }
+.search-input-wrapper input { width: 100%; box-sizing: border-box; }
+.loading-spinner { border: 3px solid rgba(0, 0, 0, 0.1); width: 18px; height: 18px; border-radius: 50%; border-left-color: #42b983; animation: spin 1s ease infinite; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
+@keyframes spin { 0% { transform: translateY(-50%) rotate(0deg); } 100% { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* 主页样式 */
+.home .hero { border: 1px solid #eaeaea; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 20px; background:#fff; }
+.home .cta { display: flex; justify-content: center; gap: 12px; margin-top: 12px; }
+.home .primary { background: #42b983; color:#fff; border:none; padding:10px 16px; border-radius:8px; }
+.home .secondary { background: #fff; color:#42b983; border:1px solid #42b983; padding:10px 16px; border-radius:8px; }
+.quick-cards { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
+.card { border:1px solid #eaeaea; border-radius:12px; padding:16px; background:#fff; }
+.card .big { font-size: 20px; font-weight: bold; }
+
+/* 预算页布局 */
+.toolbar { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:12px 16px; border:1px solid #eaeaea; border-radius:12px; background:#fff; margin-bottom:16px; }
+.sticker { position: sticky; top: 8px; z-index: 2; }
+.toolbar .left { display:flex; align-items:center; gap:8px; }
+.toolbar .right { display:flex; align-items:center; gap:8px; }
+.pill { padding:6px 10px; border-radius:999px; background:#f6f6f6; font-weight:600; }
+.pill.good { background:#e9f7ef; color:#1e7e34; }
+.pill.bad { background:#fdecea; color:#b02a37; }
+
+.budget-grid { display:grid; grid-template-columns: 1fr 2fr; gap:16px; align-items:start; }
+.leftcol .card, .rightcol .card { border:1px solid #eaeaea; border-radius:12px; padding:16px; background:#fff; }
+
+.row { display:flex; }
+.wrap { flex-wrap: wrap; }
+.hgap { gap:8px; }
+.vgap { flex-direction: column; gap:8px; }
+.btn { padding:6px 10px; border:1px solid #ddd; background:#fff; border-radius:8px; cursor:pointer; }
+.btn.ghost { background:#fafafa; }
+.primary { background:#42b983; color:#fff; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; }
+.icon { padding:4px 8px; border:1px solid #eee; border-radius:6px; background:#fff; cursor:pointer; }
+.icon.danger { color:#b02a37; border-color:#f3c2c2; }
+
+input, select { padding:10px; border:1px solid #ddd; border-radius:8px; }
+.linkish { background:none; border:none; color:#42b983; cursor:pointer; text-decoration:underline; }
+
+.mini-table, .data-table { width:100%; border-collapse: collapse; margin-top:10px; }
+.mini-table th, .mini-table td, .data-table th, .data-table td { border-bottom:1px solid #f0f0f0; padding:8px; text-align:left; }
+.data-table tfoot td { border-top:2px solid #f0f0f0; }
+.table-toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.sort { display:inline-block; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; margin-left:4px; }
+.sort.asc { border-bottom:6px solid #999; }
+.sort.desc { border-top:6px solid #999; }
+
+/* Chips */
+.chip { padding:4px 8px; border-radius:999px; background:#f3f3f3; cursor:pointer; border:1px solid #e8e8e8; }
+.chip:hover { background:#ececec; }
 </style>
