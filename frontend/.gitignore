@@ -1,0 +1,20 @@
+# Node / Vue
+node_modules/
+dist/
+.cache/
+coverage/
+
+# Locks（保留你实际使用的那一个）
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
