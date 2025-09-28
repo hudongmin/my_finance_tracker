@@ -653,39 +653,3 @@ input, select { padding:10px; border:1px solid #ddd; border-radius:8px; }
 .chip:hover { background:#ececec; }
 </style>
 
-
-/* ------- 全局：手机端一列 ------- */
-@media (max-width: 768px) {
-  #app { padding: 12px; }
-
-  /* 导航按钮堆叠、全宽 */
-  header .nav { display: grid; grid-template-columns: 1fr; gap: 8px; }
-  header .nav button { width: 100%; }
-
-  /* 所有行在手机端改为纵向排列 */
-  .row { flex-direction: column; gap: 8px; }
-  input, select, button { width: 100%; }
-
-  /* 图表在手机上降低高度，防止撑满 */
-  .chart-container { height: 280px; }
-
-  /* 预算页：两栏变单栏 */
-  .budget-2col-grid { grid-template-columns: 1fr; gap: 12px; }
-  /* KPI 卡片由三列变一列 */
-  .kpi-row { grid-template-columns: 1fr; }
-
-  /* 取消粘顶，避免遮挡 */
-  .sticker { position: static; top: auto; z-index: auto; }
-
-  /* 表格横向滚动（不挤爆布局） */
-  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .data-table th, .data-table td { white-space: nowrap; }
-
-  /* 卡片留点内边距、阴影更轻一点 */
-  .card { padding: 14px; }
-}
-
-/* ------- 平板适配（可选）：<1024px 也变单列 ------- */
-@media (max-width: 1024px) {
-  .budget-2col-grid { grid-template-columns: 1fr; }
-}
