@@ -445,25 +445,20 @@ def market_search():
         print("search error:", e)
         return jsonify([])
 
-@app.get("/api/quote")
-def market_quote():
-    """
-    入参：?symbol=  可以是 6位A股代码、159202、159202.SZ、QQQ、AAPL、中文映射后的词等
-    出参：至少包含 { symbol, price }。其余字段（name/currency/ts/source/exchange）前端用不用都无所谓
-    """
-    s = (request.args.get('symbol') or '').strip()
-    if not s:
-        return jsonify({"symbol": "", "price": 0})
+@app.route('/api/quote', methods=['GET'])
+def get_quote():
+    symbol = (request.args.get('symbol') or '').strip()
+    if not symbol:
+        return jsonify({"error": "symbol is required"}), 400
     try:
-        qr = smart_quote(s)
-        if qr and qr.price is not None:
-            # 返回完整字段（前端只会取 price；多给不影响）
-            return jsonify(qr.to_json())
-        # 没取到就兜底为 0（或改成维持旧值）
-        return jsonify({"symbol": s, "price": 0})
+        q = smart_quote(symbol)
+        print('[quote]', symbol, q.to_json() if q else None)  # 调试日志
+        if not q or q.price is None:           # ← 没拿到价就返回 404
+            return jsonify({"error": "no quote"}), 404
+        return jsonify(q.to_json()), 200       # ← 返回完整对象，别只返回 price/symbol
     except Exception as e:
-        print("quote error:", e)
-        return jsonify({"symbol": s, "price": 0})
+        print('[quote] error:', e)
+        return jsonify({"error": str(e)}), 500
     
 # ---------------- 财务规划曲线 ----------------
 @app.route('/api/plan/curve', methods=['POST'])
